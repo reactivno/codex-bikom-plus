@@ -2,13 +2,15 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    # Прод — главная ветка репозитория,
+    # как бы она ни называлась: main, master, develop.
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

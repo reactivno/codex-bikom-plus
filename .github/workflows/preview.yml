@@ -50,6 +50,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
-          PREVIEW_BASE: ${{ secrets.PREVIEW_BASE_URL }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
         run: |
-          gh pr comment "$PR" --body "Стенд: ${PREVIEW_BASE}/pr-${PR}/"
+          OWNER="${OWNER,,}"
+          REPO="${REPO,,}"
+          if [ "$REPO" = "${OWNER}.github.io" ]; then
+            BASE="https://${OWNER}.github.io"
+          else
+            BASE="https://${OWNER}.github.io/${REPO}"
+          fi
+          gh pr comment "$PR" --body "Стенд: ${BASE}/pr-${PR}/"
