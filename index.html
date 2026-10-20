@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Сайт</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <h1>Сайт на HTML/CSS/JS</h1>
+      <p>Базовый каркас: форма отправляется в PHP, обработчик шлёт письмо.</p>
+
+      <form
+        class="form"
+        id="lead-form"
+        method="post"
+        action="php/send.php"
+        novalidate
+      >
+        <label>
+          Имя
+          <input
+            type="text"
+            name="name"
+            required
+            maxlength="100"
+            autocomplete="name"
+          />
+        </label>
+        <label>
+          Email
+          <input
+            type="email"
+            name="email"
+            required
+            maxlength="200"
+            autocomplete="email"
+          />
+        </label>
+        <label>
+          Сообщение
+          <textarea
+            name="message"
+            required
+            maxlength="5000"
+            rows="5"
+          ></textarea>
+        </label>
+
+        <!-- ловушка для ботов: скрытое поле должно остаться пустым -->
+        <div class="honeypot" aria-hidden="true">
+          <label>
+            Сайт
+            <input
+              type="text"
+              name="website"
+              tabindex="-1"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+
+        <button type="submit">Отправить</button>
+        <p class="form__status" id="lead-status" role="status"></p>
+      </form>
+    </main>
+    <script src="js/main.js" type="module"></script>
+  </body>
+</html>
