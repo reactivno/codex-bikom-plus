@@ -125,6 +125,13 @@ if (PHP_SAPI === 'cli-server') {
 }
 
 $path = trim($path, '/');
+// Поддерживаем исходные .html без файлов-дублей и без изменения схемы CSV.
+if (str_ends_with($path, '.html')) {
+    $dataPath = substr($path, 0, -5);
+    if (in_array($dataPath, HTML_PAGE_PATHS, true)) {
+        $path = $dataPath;
+    }
+}
 if ($path === '' || $path === 'index.html') {
     $path = HOME_PATH;
 }
