@@ -1,3 +1,0 @@
-* text=auto eol=lf
-php/send.php text eol=crlf
-.github/workflows/cleanup.yml text eol=crlf
