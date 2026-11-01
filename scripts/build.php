@@ -112,6 +112,10 @@ function write_out(string $file, string $content): void
 /** Путь страницы -> файл стенда: /uslugi -> uslugi/index.html, home -> index.html. */
 function out_file(string $outDir, string $path): string
 {
+    if (in_array($path, HTML_PAGE_PATHS, true)) {
+        return $outDir . page_uri($path);
+    }
+
     return $path === HOME_PATH ? $outDir . '/index.html' : $outDir . '/' . $path . '/index.html';
 }
 
@@ -197,7 +201,7 @@ if ($canonical !== '' && !str_starts_with($canonical, $siteUrl)) {
 
 $selected = [];
 if (!$sample && $changedFrom === '') {
-    $selected = array_keys($entries); // полная сборка
+    $selected = array_fill_keys(array_keys($entries), true); // полная сборка
 } else {
     // Образцы: главная плюс по несколько страниц каждого типа.
     $selected[HOME_PATH] = HOME_PATH;

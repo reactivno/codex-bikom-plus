@@ -16,6 +16,18 @@ const PARTIAL_DIR = ROOT_DIR . '/partials';
 // Главная страница живёт в строке CSV с path=home и в URL "/".
 const HOME_PATH = 'home';
 
+// Адреса перенесённого сайта сохраняют .html; ключи данных остаются без расширения.
+const HTML_PAGE_PATHS = [
+    'kontakty', 'uslugi', 'opravy', 'kontaktnye-linzy', 'novosti',
+    'konsultatciia-vracha-oftalmologa', 'izgotovlenie-ochkov',
+    'novosti/kak-podobrat-ochki-dlya-zreniya',
+    'novosti/uslugi-oftalmologa-luchshie-specialisty-i-sovremennoe-oborudovanie',
+    'novosti/ochkovye-opravy-sovershenstvo-stilya',
+    'akcii', 'detskie-ochki', 'politika-konfidencialnosti', 'soglasie-na-obrabotku-pd',
+    'diagnostika-zreniya', 'kompyuternaya-diagnostika', 'nochnye-linzy',
+    'lechenie', 'lechenie-keratokonusa',
+];
+
 // Служебные каталоги: наружу не отдаются. Apache закрывает их rewrite-ом,
 // роутер — этим списком, чтобы запрет работал и на php -S, где .htaccess не читается.
 const DENY_PREFIXES = ['cache', 'data', 'lib', 'scripts', 'templates', 'partials'];
@@ -75,7 +87,11 @@ function site_base(?string $override = null): string
 /** Путь страницы -> адрес на сайте: главная живёт в корне. */
 function page_uri(string $path): string
 {
-    return $path === HOME_PATH ? '/' : '/' . $path;
+    if ($path === HOME_PATH) {
+        return '/';
+    }
+
+    return '/' . $path . (in_array($path, HTML_PAGE_PATHS, true) ? '.html' : '');
 }
 
 /** Абсолютный адрес страницы — для canonical, sitemap и JSON-LD. */
