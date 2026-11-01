@@ -1,0 +1,171 @@
+name: Deploy
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+# два быстрых мержа подряд не должны синхронизировать FTP параллельно
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Прод — главная ветка репозитория,
+    # как бы она ни называлась: main, master, develop.
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Проверка синтаксиса PHP
+        run: |
+          find . -name '*.php' -not -path './.git/*' -print0 \
+            | xargs -0 -r -n1 php -l
+
+      - name: Проверка SITE_URL
+        # Пустой SITE_URL отправил бы на прод canonical и sitemap с localhost.
+        # Домен не секрет, но берём и из Variables, и из Secrets: люди кладут
+        # его то туда, то туда, и падать из-за этого незачем. Схема любая.
+        # Значение печатаем и нормализуем: видно, что в нём на самом деле.
+        env:
+          RAW_SITE_URL: ${{ vars.SITE_URL || secrets.SITE_URL }}
+          VISIBLE_VARS: ${{ toJSON(vars) }}
+        run: |
+          value="$RAW_SITE_URL"
+          value="${value//[[:space:]]/}"
+          value="${value//\"/}"
+          value="${value//\'/}"
+          printf 'SITE_URL: длина %s, значение [%s]\n' "${#value}" "$value"
+          case "${value,,}" in
+            http://?*|https://?*)
+              echo "SITE_URL=$value" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "SITE_URL не найден ни в Variables, ни в Secrets"
+              echo "job видит такие Variables: $VISIBLE_VARS"
+              echo "проверьте: Settings -> Secrets and variables -> Actions"
+              echo "Variables должны быть уровня репозитория, не Environment"
+              exit 1
+              ;;
+          esac
+
+      - name: Настройка схемы
+        # Редирект http->https в .htaccess включается отсутствием маркера.
+        # Сайту на http кладём http-only.txt: иначе Apache уводил бы всех
+        # на https, которого у хостинга нет. Наружу не отдаётся (FilesMatch).
+        # SITE_URL приходит из предыдущего шага, уже без пробелов.
+        run: |
+          case "${SITE_URL,,}" in
+            http://*)
+              echo "схема http: редирект на https выключен"
+              echo "http-only" > http-only.txt
+              ;;
+            *)
+              echo "схема https: редирект http -> https включён"
+              rm -f http-only.txt
+              ;;
+          esac
+
+      - name: Данные страниц
+        # canonical и sitemap собираются с доменом сайта: он в переменной
+        # репозитория, а не в коде. Пустая переменная даёт адреса localhost.
+        run: php scripts/split-data.php --site-url="$SITE_URL"
+
+      - name: Токен прогрева для хостинга
+        # Без токена прогрев и prune недоступны. PHP-FPM на хостинге может не
+        # видеть переменные окружения сайта, поэтому кладём токен dotfile'ом
+        # в корень: наружу его не отдаёт правило FilesMatch в .htaccess.
+        env:
+          WARMUP_TOKEN: ${{ secrets.WARMUP_TOKEN }}
+        run: |
+          if [ -z "$WARMUP_TOKEN" ]; then
+            echo "секрет WARMUP_TOKEN не задан"
+            exit 1
+          fi
+          # Перевод строки в секрете не должен попасть в файл и заголовок.
+          token=$(printf '%s' "$WARMUP_TOKEN" | tr -d '[:space:]')
+          printf '%s' "$token" > .warmup-token
+
+      - name: Загрузка на хостинг
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/*.md
+            **/.env*
+            **/.pi-subagents/**
+            .ftp-deploy-sync-state.json
+            cache/**
+            _site/**
+            data/pages.csv
+            scripts/split-data.php
+            scripts/build.php
+            scripts/check.php
+
+      - name: Прогрев кэша
+        # Apache отдаёт готовый HTML из cache/ напрямую: без прогрева правка
+        # шаблона не долетит до посетителя. Число страниц — из count индекса,
+        # прогреваем ровно столько, сколько страниц в data/index.json.
+        env:
+          WARMUP_TOKEN: ${{ secrets.WARMUP_TOKEN }}
+        run: |
+          set -e
+          # Секрет мог приехать с хвостовым переводом строки: на хостинге
+          # env_value() срезает пробелы, тут их надо срезать самим.
+          token=$(printf '%s' "$WARMUP_TOKEN" | tr -d '[:space:]')
+          index=data/index.json
+          count=$(php -r '
+            $d = json_decode(file_get_contents($argv[1]), true);
+            echo (int)($d["count"] ?? 0);
+          ' "$index")
+          if [ "$count" -le 0 ]; then
+            echo "в индексе нет страниц: count=$count"
+            exit 1
+          fi
+          for ((from=0; from<count; from+=500)); do
+            answer=$(curl -sS -H "X-Warmup-Token: ${token}" \
+              "${SITE_URL}/scripts/warmup.php?from=${from}&limit=500")
+            echo "$from: $answer"
+            case "$answer" in
+              *"ошибок: 0"*) ;;
+              *) echo "прогрев вернул ошибки"; exit 1 ;;
+            esac
+          done
+
+      - name: Очистка кэша (prune)
+        # Без prune страница, убранная из CSV, живёт в cache/ вечно и отдаётся
+        # Apache напрямую (200 вместо 404). Вызываем один раз после прогрева.
+        env:
+          WARMUP_TOKEN: ${{ secrets.WARMUP_TOKEN }}
+        run: |
+          set -e
+          token=$(printf '%s' "$WARMUP_TOKEN" | tr -d '[:space:]')
+          # Без -f видно тело 403: «403 Forbidden» — это warmup.php (токен),
+          # голое «Forbidden» — запрет Apache из .htaccess.
+          answer=$(curl -sS -w '\nHTTP %{http_code}' \
+            -H "X-Warmup-Token: ${token}" \
+            "${SITE_URL}/scripts/warmup.php?prune=1")
+          echo "$answer"
+          case "$answer" in
+            *"HTTP 200"*) ;;
+            *"HTTP 403"*)
+              echo "403: WARMUP_TOKEN в окружении сайта не совпадает с секретом"
+              echo "репозитория или .htaccess закрыл scripts/warmup.php"
+              exit 1
+              ;;
+            *) exit 1 ;;
+          esac
