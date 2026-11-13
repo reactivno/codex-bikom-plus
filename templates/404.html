@@ -1,23 +1,18 @@
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{title}}</title>
-    {{{_robots}}}
-    <link rel="stylesheet" href="{{_base}}/css/style.css" />
-    <link rel="stylesheet" href="{{_base}}/css/typography.css" />
-    <script type="module" src="{{_base}}/js/main.js"></script>
-  </head>
-  <body>
-    {{ include header}}
-    <main id="main" class="section wrap">
-      <h1>{{h1}}</h1>
-      <p>
-        Такой страницы нет. Проверьте адрес или вернитесь на
-        <a href="{{_base}}/">главную</a>.
-      </p>
-    </main>
-    {{ include footer}}
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{title}} | Биком плюс, Пенза</title>
+<meta name="description" content="Перейдите на главную страницу Биком плюс или выберите нужную услугу.">
+{{{_robots}}}
+<link rel="stylesheet" href="{{_base}}/css/style.css">
+<link rel="stylesheet" href="{{_base}}/css/typography.css">
+<script type="module" src="{{_base}}/js/main.js"></script>
+</head>
+<body>
+{{ include header}}
+<main id="main"><section class="pagehead wrap"><div class="crumb"><a class="" href="{{_base}}/">Главная</a> / <span>404</span></div><span class="eyebrow">404 / Биком плюс</span><h1>Кажется, эта страница<br>вне поля зрения</h1><p class="lead">Вернитесь на главную или откройте раздел услуг.</p></section><section class="wrap section compact"><a class="button" href="{{_base}}/">На главную <span aria-hidden="true">↗</span></a><a class="textlink" href="{{_base}}/uslugi.html">Выбрать услугу</a></section></main>
+{{ include footer}}
+</body>
 </html>
